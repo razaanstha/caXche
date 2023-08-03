@@ -37,3 +37,13 @@ We welcome your feedback and bug reports. Feel free to contact us through our su
 5. Choose the downloaded ZIP file and click **Install Now**.
 6. Once installed, click **Activate** to enable the plugin.
 
+## Cache Clearing
+
+Currently the cache is cleared automatically when the following are updated:
+
+- WordPress post is updated/deleted.
+- WordPress term is updated/deleted.
+- WordPress setting is updated.
+- WordPress nav menu is updated.
+- Post with Advanced Custom Fields (ACF) fields is updated.
+- ACF options page is updated.
