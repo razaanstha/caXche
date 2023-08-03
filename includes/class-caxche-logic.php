@@ -19,21 +19,8 @@ class CaxchedLogic
      */
     public static function init()
     {
-        // Schedules the cache cleaner schedule
-        self::schedule_weekly_cache_cleanup();
-
         // Check if the current request should be served from the cache or should be cached
         if (!self::is_caxcheable()) return;
-
-        // Check if the REQUEST_URI starts with the upload direcyory
-        if (str_starts_with($_SERVER['REQUEST_URI'], (str_replace(ABSPATH, '', (wp_upload_dir()['basedir'] ?? ''))))) return;
-
-        // Reset cache when the posts are updated
-        add_action('acf/save_post', [__CLASS__, 'cleanup_cache_directory'], 200);
-        // Reset cache when the ACF option page is updated
-        add_action('acf/options_page/save', [__CLASS__, 'cleanup_cache_directory'], 200);
-
-        // Check and serve
         return self::serve_cache_if_available();
     }
 
@@ -385,13 +372,16 @@ class CaxchedLogic
     public static function cleanup_cache_directory()
     {
         try {
-            $files = glob(self::CAXCHED_DIRECTORY . '/*');
-            if ($files === false) {
-                return;
-            }
+            $cache_files = glob(self::CAXCHED_DIRECTORY . '*');
+            $files_to_be_cleared = array_filter($cache_files, function ($file) {
+                return basename($file) !== 'index.php';
+            });
+
+            // No files to be cleaned
+            if (empty($files_to_be_cleared) || $cache_files == false) return error_log('CXCHE CLEANUP NO FILES');
 
             // Check and clear each file
-            foreach ($files as $file) {
+            foreach ($files_to_be_cleared as $file) {
                 if (is_file($file) && basename($file) !== 'index.php' && strpos(basename($file), self::CAXCHED_PREFIX) === 0) {
                     unlink($file);
                 }

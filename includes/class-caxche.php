@@ -112,7 +112,54 @@ class Caxche
             }
         });
 
-        // Initalize the caching functionality to store cache 
+        // Initalize the caching functionality to collect caching 
         add_action('init', [CaxchedLogic::class, 'init']);
+
+        /**
+         * Cache Cleanup when
+         */
+        // Every weekly by using WP CRON 
+        CaxchedLogic::schedule_weekly_cache_cleanup();
+
+        // When the post is updated
+        add_action('post_updated', [__CLASS__, 'run_cache_cleanup']);
+
+        // When the post is deleted
+        add_action('delete_post', [__CLASS__, 'run_cache_cleanup']);
+
+        // When term is updated
+        add_action('edited_term', [__CLASS__, 'run_cache_cleanup']);
+
+        // When term is deleted
+        add_action('edited_term', [__CLASS__, 'run_cache_cleanup']);
+
+        // When the WP options (WP Core Settings) page is updated
+        add_action('admin_init', function () {
+            if (
+                isset($_POST['_wpnonce'], $_POST['action'], $_POST['_wp_http_referer']) &&
+                $_POST['action'] === 'update' &&
+                is_string($_POST['_wp_http_referer']) &&
+                str_starts_with($_POST['_wp_http_referer'], '/wp-admin/options')
+            ) {
+                CaxchedLogic::cleanup_cache_directory();
+            }
+        });
+
+        // When the WP nav menu is updated
+        add_action('wp_update_nav_menu', [CaxchedLogic::class, 'cleanup_cache_directory']);
+
+        // Cleanup the cache when the ACF fields are updated
+        add_action('acf/save_post', [CaxchedLogic::class, 'cleanup_cache_directory'], 200);
+
+        // Cleanup the cache when the ACF option page are updated
+        add_action('acf/options_page/save', [CaxchedLogic::class, 'cleanup_cache_directory'], 200);
+    }
+
+    /**
+     * Cleanup the cache
+     */
+    public static function run_cache_cleanup()
+    {
+        CaxchedLogic::cleanup_cache_directory();
     }
 }
