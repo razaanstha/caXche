@@ -1,4 +1,4 @@
-# Caxche
+# caXche
 
 Full Page Caching Plugin for WordPress 
 
