@@ -1,0 +1,13 @@
+{
+    "name": "Caxche",
+    "description": "The JS for preloading the pages in the client side.",
+    "scripts": {
+        "build": "esbuild src/main.js --minify --bundle --target=chrome58,firefox57,safari11,edge16 --outfile=build/caxche.js"
+    },
+    "devDependencies": {
+        "esbuild": "^0.18.17"
+    },
+    "dependencies": {
+        "quicklink": "^2.3.0"
+    }
+}
