@@ -95,7 +95,7 @@ class Caxche
     {
         // Check if the cache file exists and serve and end the process
         add_action('plugins_loaded', function () {
-            if (!(is_user_logged_in() || (defined('CAXCHE') && CAXCHE == 'none')) && CaxchedLogic::is_caxcheable()) {
+            if (CaxchedLogic::is_caxcheable()) {
                 $cache_key = CaxchedLogic::get_cache_key();
                 $cache_path = CaxchedLogic::get_cache_path($cache_key);
 

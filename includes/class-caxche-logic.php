@@ -49,10 +49,6 @@ class CaxchedLogic
         $cache_key = self::get_cache_key();
         $cache_path = self::get_cache_path($cache_key);
 
-        if (is_user_logged_in() || (defined('CAXCHE') && CAXCHE == 'none')) {
-            return self::send_minified_html_to_client();
-        }
-
         if (file_exists($cache_path)) {
             try {
                 // If is post request due to form submission do not serve with cached content
@@ -80,6 +76,8 @@ class CaxchedLogic
     {
         // If is not client request or any of the conditions are met, do nothing
         if (
+            is_admin() ||
+            is_user_logged_in() ||
             empty($_SERVER['HTTP_HOST']) ||
             defined('DOING_AJAX') && DOING_AJAX ||
             defined('DOING_CRON') && DOING_CRON ||
@@ -115,10 +113,6 @@ class CaxchedLogic
      */
     public static function start_minification()
     {
-        if (is_user_logged_in() || $_SERVER['REQUEST_METHOD'] === 'POST') {
-            return ob_start([__CLASS__, 'minify_html_output']);
-        }
-
         return ob_start([__CLASS__, 'get_minified_html_output_with_caching']);
     }
 
