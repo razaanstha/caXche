@@ -95,21 +95,7 @@ class Caxche
     {
         // Check if the cache file exists and serve and end the process
         add_action('plugins_loaded', function () {
-            if (CaxchedLogic::is_caxcheable()) {
-                $cache_key = CaxchedLogic::get_cache_key();
-                $cache_path = CaxchedLogic::get_cache_path($cache_key);
-
-                // If the cache file exists, serve and exit the process
-                if (file_exists($cache_path)) {
-                    try {
-                        $cache_contents = file_get_contents($cache_path);
-                        echo $cache_contents . "\n" . '<!-- CAXCHED: ' . $cache_key . ' -->';
-                        exit;
-                    } catch (\Exception $e) {
-                        error_log($e->getMessage());
-                    }
-                }
-            }
+            CaxchedLogic::serve_cache_if_available();
         });
 
         // Initalize the caching functionality to collect caching 

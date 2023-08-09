@@ -19,9 +19,19 @@ class CaxchedLogic
      */
     public static function init()
     {
-        // Check if the current request should be served from the cache or should be cached
-        if (!self::is_caxcheable()) return;
-        return self::serve_cache_if_available();
+        // Schedule weekly cleanup 
+        self::schedule_weekly_cache_cleanup();
+
+        // Check, store and serve cache if exists
+        self::serve_cache_if_available();
+
+        // FOR DEVELOPMENT ONLY track the total PHP execution time
+        if ((defined('CAXCHE_ENV') && strtolower(CAXCHE_ENV) == 'dev') && isset($_SERVER['REQUEST_TIME_FLOAT'])) {
+            add_action('shutdown', function () {
+                // Log total time taken for PHP execution since request time
+                error_log('without caXched: ' . get_site_url() . $_SERVER['REQUEST_URI'] . ' -> shutdown after: ' . (microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000 . 'ms');
+            });
+        }
     }
 
     /**
@@ -30,7 +40,7 @@ class CaxchedLogic
     public static function serve_cache_if_available()
     {
         // Check if the current request should be served from the cache or should be cached
-        if (!self::is_caxcheable()) return self::send_minified_html_to_client();
+        if (!self::is_cacheable()) return self::send_minified_html_to_client();
 
         // Checks and serve the pages with cached content
         $cache_key = self::get_cache_key();
@@ -45,6 +55,12 @@ class CaxchedLogic
                 header('X-Cache: HIT (cached) ' . $cache_key);
                 $cache_contents = file_get_contents($cache_path);
                 echo $cache_contents . "\n" . '<!-- CAXCHED: ' . $cache_key . ' -->';
+
+                // For Development mode
+                if ((defined('CAXCHE_ENV') && strtolower(CAXCHE_ENV) == 'dev')) {
+                    // Log the total time taken for PHP execution since request time
+                    error_log('caXched: ' . get_site_url() . $_SERVER['REQUEST_URI'] . ' -> shutdown after: ' . (microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000 . 'ms');
+                }
                 exit;
             } catch (\Exception $e) {
                 error_log('Error serving from cache: ' .  $e->getMessage());
@@ -55,33 +71,12 @@ class CaxchedLogic
     }
 
     /**
-     * Check if the requested source is cacheable
-     *
-     * @return boolean
-     */
-    public static function is_caxcheable()
-    {
-        // If is not client request or any of the conditions are met, do nothing
-        if (
-            is_admin() ||
-            is_user_logged_in() ||
-            empty($_SERVER['HTTP_HOST']) ||
-            defined('DOING_AJAX') && DOING_AJAX ||
-            defined('DOING_CRON') && DOING_CRON ||
-            defined('WP_CLI') && WP_CLI ||
-            str_starts_with($_SERVER['REQUEST_URI'], str_replace(ABSPATH, '', wp_upload_dir()['basedir'] ?? ''))
-        ) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * Sends the minified html to the client while trying to set caching
      */
     private static function send_minified_html_to_client()
     {
+        if (!self::is_cacheable()) return;
+
         add_action('send_headers', [__CLASS__, 'start_minification'], -1);
         add_action('send_footers', [__CLASS__, 'end_minification'], 9999);
 
@@ -93,6 +88,29 @@ class CaxchedLogic
                 <script id="caxched-js">{$caxche_js}</script>
             HTML;
         });
+    }
+
+    /**
+     * Check if the requested source is cacheable
+     *
+     * @return boolean
+     */
+    public static function is_cacheable()
+    {
+        if (
+            empty($_SERVER['HTTP_HOST'])
+            || (defined('CAXCHE_ENV') && CAXCHE_ENV == 'none')
+            || (defined('DOING_AJAX') && DOING_AJAX)
+            || (defined('DOING_CRON') && DOING_CRON)
+            || (defined('WP_CLI') && WP_CLI)
+            || str_starts_with($_SERVER['REQUEST_URI'], str_replace(ABSPATH, '', wp_upload_dir()['basedir'] ?? ''))
+            || is_admin()
+            || is_user_logged_in()
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -118,17 +136,19 @@ class CaxchedLogic
         $minified_html = self::minify_html_output($html);
 
         // Set custom header indicating the page is served from cache
-        header('X-Cache: HIT (REQUESTED)');
+        header('X-Cache: HIT');
 
         // Create a new cache entry in the cache directory with the html content
-        file_put_contents($cache_path, $minified_html);
-
-        // Ensure the <html> tag is closed in the minified HTML output
-        if (str_contains($minified_html, '<html>') && !str_contains($minified_html, '</html>')) {
-            $minified_html .= '</html>';
+        if (self::is_cacheable()) {
+            file_put_contents($cache_path, $minified_html);
+            // Ensure the <html> tag is closed in the minified HTML output
+            if (str_contains($minified_html, '<html>') && !str_contains($minified_html, '</html>')) {
+                $minified_html .= '</html>';
+            }
+            $minified_html .= "\n" . "<!-- SETTING_CAXCHED: {$cache_key} -->";
         }
 
-        $minified_html .= "\n" . "<!-- SETTING_CAXCHED: {$cache_key} -->";
+
 
         return $minified_html;
     }
@@ -196,9 +216,6 @@ class CaxchedLogic
         // Remove spaces between attributes
         $html = preg_replace('/\s*=\s*/', '=', $html);
 
-        // Remove `/>` from self-closing tags
-        $html = preg_replace('/\s+\/>/', '>', $html);
-
         return $html;
     }
 
@@ -238,15 +255,13 @@ class CaxchedLogic
                     $url = $link->getAttribute('href');
                     $resource_location = $url;
 
-                    if (str_starts_with($url, $theme_directory) || str_starts_with($url, '/wp-') || str_starts_with($url, $site_url)) {
-                        // if (str_starts_with($url, $theme_directory) || str_starts_with($url, $site_url)) {
-                        //     $parsed_resource_location = parse_url($url);
-                        //     $resource_location = ABSPATH . ltrim($parsed_resource_location['path'] ?? false);
-                        // } else {
+                    if (
+                        str_starts_with($url, $theme_directory)
+                        || str_starts_with($url, '/wp-')
+                        || str_starts_with($url, $site_url)
+                    ) {
                         $parse_resource_location = parse_url($url);
                         $resource_location = str_replace('//', '/', ABSPATH . ltrim($parse_resource_location['path']));
-                        // }
-                        // error_log(print_r($resource_location, true));
 
                         // URL Parts
                         $url_path = explode('/', $url);
@@ -265,11 +280,14 @@ class CaxchedLogic
                                     $customized_inlined_style = preg_replace_callback('/url\((.*?)\)/i', function ($match) use ($url_path) {
                                         $url = $match[1];
 
+                                        // Unquote the URL if is quoted
+                                        $url = trim($url, "'\"");
+
                                         if (
                                             preg_match('/^https?|\'https?|\"https?/', $url)
                                             || preg_match('/^data:?|\'data:?|\"data:?/', $url)
                                         ) {
-                                            return "url({$url})";
+                                            return "url('{$url}')";
                                         }
 
                                         // Get the css directory path

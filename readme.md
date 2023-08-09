@@ -26,8 +26,6 @@ This is a lightweight full page caching plugin for WordPress that aims to provid
 
 **Try at your own risk**: While the plugin has been designed with care to provide efficient caching and enhance site performance, using any caching plugin carries certain risks. Before installing or activating the plugin, we recommend taking a full backup of your WordPress site to safeguard against any potential data loss or compatibility issues.
 
-We welcome your feedback and bug reports. Feel free to contact us through our support channels for assistance and to report any issues you may encounter.
-
 ## Installation
 
 1. Download the plugin ZIP file.
@@ -47,3 +45,9 @@ Currently the cache is cleared automatically when the following are updated:
 - WordPress nav menu is updated.
 - Post with Advanced Custom Fields (ACF) fields is updated.
 - ACF options page is updated.
+
+## Benchmarks
+```
+[08-Aug-2023 09:53:46 UTC] caXched: https://caxched.test/ -> shutdown after: 35.644811630249ms 
+[08-Aug-2023 09:54:01 UTC] without caXched: https://caxched.test/ -> shutdown after: 130.8650970459ms 
+```
